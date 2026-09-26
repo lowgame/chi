@@ -238,7 +238,10 @@ func (c *Compressor) selectEncoder(h http.Header, w io.Writer) (io.Writer, strin
 	for _, name := range c.encodingPrecedence {
 		if matchAcceptEncoding(accepted, name) {
 			if pool, ok := c.pooledEncoders[name]; ok {
-				encoder := pool.Get().(ioResetterWriter)
+				encoder, ok := pool.Get().(ioResetterWriter)
+				if !ok {
+					continue
+				}
 				cleanup := func() {
 					pool.Put(encoder)
 				}
@@ -247,7 +250,9 @@ func (c *Compressor) selectEncoder(h http.Header, w io.Writer) (io.Writer, strin
 
 			}
 			if fn, ok := c.encoders[name]; ok {
-				return fn(w, c.level), name, func() {}
+				if encoder := fn(w, c.level); encoder != nil {
+					return encoder, name, func() {}
+				}
 			}
 		}
 
